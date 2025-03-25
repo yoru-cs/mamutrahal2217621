@@ -1,0 +1,40 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 50px;
+    background-color: #000000;
+    color: white;
+}
+
+.button-container {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+button {
+    padding: 15px 25px;
+    font-size: 18px;
+    cursor: pointer;
+    background-color: #32CD32; /* Flame Green */
+    border: none;
+    color: black;
+    font-weight: bold;
+    border-radius: 5px;
+}
+
+button:hover {
+    background-color: #28A428;
+}
+
+.image-container {
+    margin-top: 20px;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 10px auto;
+}

@@ -1,0 +1,9 @@
+function showMessage(text) {
+    document.getElementById("message").textContent = text;
+}
+
+function loadImage(event) {
+    const image = document.getElementById("site-image");
+    image.src = URL.createObjectURL(event.target.files[0]);
+    image.onload = () => URL.revokeObjectURL(image.src); // Free memory
+}
