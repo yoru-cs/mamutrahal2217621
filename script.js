@@ -44,15 +44,29 @@ function update() {
         ball.dx *= -1;
     }
 
-    // Move paddles
-    leftPaddle.y += leftPaddle.dy;
-    rightPaddle.y += rightPaddle.dy;
+    // Move paddles (both AI-controlled)
+    movePaddle(leftPaddle);
+    movePaddle(rightPaddle);
 
     // Prevent paddles from going out of bounds
     leftPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, leftPaddle.y));
     rightPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, rightPaddle.y));
 
     requestAnimationFrame(draw);
+}
+
+function movePaddle(paddle) {
+    // AI-Controlled paddles follow the ball's Y position
+    if (paddle.y + paddleHeight / 2 < ball.y) {
+        paddle.dy = 4; // Move down
+    } else if (paddle.y + paddleHeight / 2 > ball.y) {
+        paddle.dy = -4; // Move up
+    } else {
+        paddle.dy = 0; // Stop moving if the paddle is aligned with the ball
+    }
+
+    // Apply the paddle's movement
+    paddle.y += paddle.dy;
 }
 
 function draw() {
@@ -62,18 +76,5 @@ function draw() {
     drawBall();
     update();
 }
-
-// Paddle controls
-document.addEventListener("keydown", (e) => {
-    if (e.key === "w") leftPaddle.dy = -6;
-    if (e.key === "s") leftPaddle.dy = 6;
-    if (e.key === "ArrowUp") rightPaddle.dy = -6;
-    if (e.key === "ArrowDown") rightPaddle.dy = 6;
-});
-
-document.addEventListener("keyup", () => {
-    leftPaddle.dy = 0;
-    rightPaddle.dy = 0;
-});
 
 draw();
