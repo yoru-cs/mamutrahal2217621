@@ -12,7 +12,7 @@ let leftPaddle = { x: 50, y: canvas.height / 2 - 50, dy: 0, directionChangeTime:
 let rightPaddle = { x: canvas.width - 60, y: canvas.height / 2 - 50, dy: 0, directionChangeTime: 0 };
 
 // Ball
-let ball = { x: canvas.width / 2, y: canvas.height / 2, dx: 4, dy: 4 };
+let ball = { x: canvas.width / 2, y: canvas.height / 2, dx: 4, dy: 4, trail: [] };
 
 function drawPaddle(paddle) {
     ctx.fillStyle = "white"; 
@@ -20,6 +20,16 @@ function drawPaddle(paddle) {
 }
 
 function drawBall() {
+    // Draw the ball's trail
+    for (let i = 0; i < ball.trail.length; i++) {
+        const trailBall = ball.trail[i];
+        ctx.fillStyle = `rgba(255, 255, 255, ${1 - i * 0.1})`; // Fade the balls in the trail
+        ctx.beginPath();
+        ctx.arc(trailBall.x, trailBall.y, ballSize, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Draw the current ball
     ctx.fillStyle = "white";
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ballSize, 0, Math.PI * 2);
@@ -51,6 +61,14 @@ function update() {
     // Prevent paddles from going out of bounds
     leftPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, leftPaddle.y));
     rightPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, rightPaddle.y));
+
+    // Store the current ball position to create the trail effect
+    ball.trail.push({ x: ball.x, y: ball.y });
+
+    // Limit the trail length to avoid excessive memory usage (keep the last 15 positions)
+    if (ball.trail.length > 15) {
+        ball.trail.shift(); // Remove the oldest trail ball
+    }
 
     requestAnimationFrame(draw);
 }
