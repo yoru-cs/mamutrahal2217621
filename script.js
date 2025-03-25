@@ -36,14 +36,27 @@ function update() {
         ball.dy *= -1;
     }
 
-    // Ball bounces off paddles
+    // Ball bounces off paddles and always moves in the opposite direction
     if (
         (ball.x <= leftPaddle.x + paddleWidth && ball.y > leftPaddle.y && ball.y < leftPaddle.y + paddleHeight) ||
         (ball.x >= rightPaddle.x - ballSize && ball.y > rightPaddle.y && ball.y < rightPaddle.y + paddleHeight)
     ) {
         ball.dx *= -1; // Reflect the ball's horizontal direction when hitting a paddle
-        // Modify the ball's vertical movement based on paddle position
-        ball.dy += Math.random() * 2 - 1;  // Adding randomness to the ball's vertical speed
+        
+        // Ensure the ball doesn't get stuck or pass through the paddles by adjusting the ball's position
+        if (ball.x <= leftPaddle.x + paddleWidth) {
+            ball.x = leftPaddle.x + paddleWidth; // Ensure the ball doesn't go through the paddle
+        }
+        if (ball.x >= rightPaddle.x - ballSize) {
+            ball.x = rightPaddle.x - ballSize; // Ensure the ball doesn't go through the paddle
+        }
+
+        // Adjust vertical direction slightly based on where it hits the paddle
+        if (ball.y < leftPaddle.y || ball.y < rightPaddle.y) {
+            ball.dy = -Math.abs(ball.dy); // Move the ball upwards
+        } else {
+            ball.dy = Math.abs(ball.dy); // Move the ball downwards
+        }
     }
 
     // Move paddles (both AI-controlled)
