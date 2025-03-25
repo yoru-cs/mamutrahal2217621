@@ -8,8 +8,8 @@ const paddleWidth = 10, paddleHeight = 100; // Vertical paddles
 const ballSize = 10;
 
 // Paddles
-let leftPaddle = { x: 50, y: canvas.height / 2 - 50, dy: 0 };
-let rightPaddle = { x: canvas.width - 60, y: canvas.height / 2 - 50, dy: 0 };
+let leftPaddle = { x: 50, y: canvas.height / 2 - 50, dy: 0, directionChangeTime: 0 };
+let rightPaddle = { x: canvas.width - 60, y: canvas.height / 2 - 50, dy: 0, directionChangeTime: 0 };
 
 // Ball
 let ball = { x: canvas.width / 2, y: canvas.height / 2, dx: 4, dy: 4 };
@@ -56,13 +56,13 @@ function update() {
 }
 
 function movePaddle(paddle) {
-    // AI-Controlled paddles follow the ball's Y position
-    if (paddle.y + paddleHeight / 2 < ball.y) {
-        paddle.dy = 4; // Move down
-    } else if (paddle.y + paddleHeight / 2 > ball.y) {
-        paddle.dy = -4; // Move up
+    // Randomize paddle direction
+    if (paddle.directionChangeTime <= 0) {
+        // Choose a random direction and speed
+        paddle.dy = Math.random() < 0.5 ? -4 : 4;
+        paddle.directionChangeTime = Math.random() * 30 + 20; // Randomize how often direction changes (between 20 and 50 frames)
     } else {
-        paddle.dy = 0; // Stop moving if the paddle is aligned with the ball
+        paddle.directionChangeTime--;
     }
 
     // Apply the paddle's movement
