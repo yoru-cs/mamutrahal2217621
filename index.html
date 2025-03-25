@@ -12,7 +12,18 @@
     </header>
     <main>
         <p>This is a simple website hosted on GitHub Pages.</p>
-        <button onclick="showMessage()">Click Me</button>
+        <p>Explore different assignments by clicking the buttons below.</p>
+        <div class="button-container">
+            <button onclick="showMessage('Assignment 1 content')">Assignment 1</button>
+            <button onclick="showMessage('Assignment 2 content')">Assignment 2</button>
+            <button onclick="showMessage('Assignment 3 content')">Assignment 3</button>
+            <button onclick="showMessage('Assignment 4 content')">Assignment 4</button>
+            <button onclick="showMessage('Assignment 5 content')">Assignment 5</button>
+        </div>
+        <div class="image-container">
+            <img id="site-image" src="" alt="Your Image Here">
+            <input type="file" id="imageUploader" accept="image/*" onchange="loadImage(event)">
+        </div>
         <p id="message"></p>
     </main>
     <script src="script.js"></script>
