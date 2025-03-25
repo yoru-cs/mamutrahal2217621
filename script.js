@@ -51,7 +51,9 @@ function update() {
         (ball.x <= leftPaddle.x + paddleWidth && ball.y > leftPaddle.y && ball.y < leftPaddle.y + paddleHeight) ||
         (ball.x >= rightPaddle.x - ballSize && ball.y > rightPaddle.y && ball.y < rightPaddle.y + paddleHeight)
     ) {
-        ball.dx *= -1;
+        ball.dx *= -1;  // Change direction when hitting paddle
+        // Modify the ball's velocity based on the paddle's direction
+        ball.dy += Math.random() * 2 - 1;  // Adding randomness to the ball's vertical speed
     }
 
     // Move paddles (both AI-controlled)
@@ -70,15 +72,15 @@ function update() {
         ball.trail.shift(); // Remove the oldest trail ball
     }
 
-    requestAnimationFrame(draw);
+    requestAnimationFrame(draw); // Redraw after update
 }
 
 function movePaddle(paddle) {
-    // Randomize paddle direction
+    // Randomize paddle direction every set interval
     if (paddle.directionChangeTime <= 0) {
-        // Choose a random direction and speed
+        // Randomize direction and speed
         paddle.dy = Math.random() < 0.5 ? -4 : 4;
-        paddle.directionChangeTime = Math.random() * 30 + 20; // Randomize how often direction changes (between 20 and 50 frames)
+        paddle.directionChangeTime = Math.random() * 30 + 20; // Change direction between 20 to 50 frames
     } else {
         paddle.directionChangeTime--;
     }
@@ -88,11 +90,11 @@ function movePaddle(paddle) {
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
     drawPaddle(leftPaddle);
     drawPaddle(rightPaddle);
     drawBall();
-    update();
+    update(); // Continue updating the game state
 }
 
-draw();
+draw(); // Initial call to start the game loop
