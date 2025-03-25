@@ -74,3 +74,23 @@ body {
     font-size: 20px;
     color: #808080; /* Smokey grey */
 }
+body {
+    font-size: 24px; /* Bigger text */
+    font-weight: bold; /* Bold text */
+}
+
+.phase-title {
+    font-size: 42px; /* Bigger phase title */
+    font-weight: bold;
+    color: #808080; /* Smokey grey */
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.bottom-text, .smiley {
+    font-size: 20px; /* Bigger text for bottom elements */
+    font-weight: bold;
+    color: #808080; /* Smokey grey */
+}
