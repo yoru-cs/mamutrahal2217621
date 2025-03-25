@@ -41,21 +41,15 @@ function update() {
         (ball.x <= leftPaddle.x + paddleWidth && ball.y > leftPaddle.y && ball.y < leftPaddle.y + paddleHeight) ||
         (ball.x >= rightPaddle.x - ballSize && ball.y > rightPaddle.y && ball.y < rightPaddle.y + paddleHeight)
     ) {
-        ball.dx *= -1; // Reflect the ball's horizontal direction when hitting a paddle
-        
-        // Ensure the ball doesn't get stuck or pass through the paddles by adjusting the ball's position
+        // Reflect the ball's horizontal direction when hitting a paddle
+        ball.dx *= -1;
+
+        // Adjust position to avoid the ball going through the paddle
         if (ball.x <= leftPaddle.x + paddleWidth) {
-            ball.x = leftPaddle.x + paddleWidth; // Ensure the ball doesn't go through the paddle
+            ball.x = leftPaddle.x + paddleWidth; // Prevent the ball from passing through the paddle
         }
         if (ball.x >= rightPaddle.x - ballSize) {
-            ball.x = rightPaddle.x - ballSize; // Ensure the ball doesn't go through the paddle
-        }
-
-        // Adjust vertical direction slightly based on where it hits the paddle
-        if (ball.y < leftPaddle.y || ball.y < rightPaddle.y) {
-            ball.dy = -Math.abs(ball.dy); // Move the ball upwards
-        } else {
-            ball.dy = Math.abs(ball.dy); // Move the ball downwards
+            ball.x = rightPaddle.x - ballSize; // Prevent the ball from passing through the paddle
         }
     }
 
