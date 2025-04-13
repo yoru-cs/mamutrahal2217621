@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Workflow</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/0.5.0-beta4/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Arial Black', sans-serif;
+            font-weight: bold;
+        }
+        
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: white;
+            overflow: hidden;
+        }
+        
+        .header {
+            background-color: #E61975; /* Amaranth color */
+            color: white;
+            text-align: center;
+            padding: 20px;
+            font-size: 32px;
+        }
+        
+        .toolbar {
+            background-color: #E61975; /* Amaranth color */
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .tool-section {
+            background-color: white;
+            border-radius: 8px;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        
+        .tool-title {
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        
+        button {
+            background-color: white;
+            border: 2px solid #333;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Arial Black', sans-serif;
+        }
+        
+        button:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .color-picker {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            cursor: pointer;
+        }
+        
+        .canvas {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 180px);
+            overflow: auto;
+            background-color: white;
+            background-image: 
+                linear-gradient(to right, #f0f0f0 1px, transparent 1px),
+                linear-gradient(to bottom, #f0f0f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        .node {
+            position: absolute;
+            min-width: 150px;
+            min-height: 80px;
+            background-color: #64B5F6;
+            border: 2px solid #333;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 10px;
+            cursor: move;
+            z-index: 10;
+            user-select: none;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .node.selected {
+            border: 3px solid #FF0000;
+            box-shadow: 0 0 8px rgba(255,0,0,0.5);
+        }
+        
+        .connector {
+            position: absolute;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">Logistics Workflow</div>
+    
+    <div class="toolbar">
+        <div class="tool-section">
+            <div class="tool-title">Add Nodes</div>
+            <button id="add-supplier">Supplier</button>
+            <button id="add-warehouse">Warehouse</button>
+            <button id="add-distribution">Distribution</button>
+            <button id="add-transport">Transport</button>
+            <button id="add-customer">Customer</button>
+            <button id="add-processing">Processing</button>
+            <button id="add-customs">Customs</button>
+        </div>
+        
+        <div class="tool-section">
+            <div class="tool-title">Edit</div>
+            <button id="undo-btn">Undo</button>
+            <button id="redo-btn">Redo</button>
+            <button id="connect-btn">Connect Nodes</button>
+            <button id="delete-btn">Delete</button>
+        </div>
+        
+        <div class="tool-section">
+            <div class="tool-title">Node Color</div>
+            <div class="color-picker">
+                <div class="color-option" style="background-color: #64B5F6;" data-color="#64B5F6"></div>
+                <div class="color-option" style="background-color: #81C784;" data-color="#81C784"></div>
+                <div class="color-option" style="background-color: #FFB74D;" data-color="#FFB74D"></div>
+                <div class="color-option" style="background-color: #BA68C8;" data-color="#BA68C8"></div>
+                <div class="color-option" style="background-color: #E57373;" data-color="#E57373"></div>
+                <div class="color-option" style="background-color: #F5F5F5;" data-color="#F5F5F5"></div>
+            </div>
+        </div>
+        
+        <div class="tool-section">
+            <div class="tool-title">Export</div>
+            <button id="save-png">Export as PNG</button>
+            <button id="save-pdf">Export as PDF</button>
+        </div>
+    </div>
+    
+    <div class="canvas" id="canvas"></div>
+    
+    <div class="zoom-controls">
+        <button id="zoom-in">+</button>
+        <button id="zoom-out">-</button>
+        <button id="zoom-reset">Reset</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('canvas');
+            let nodes = [];
+            let connections = [];
+            let selectedNodes = [];
+            let actionHistory = [];
+            let redoStack = [];
+            let draggedNode = null;
+            let offsetX, offsetY;
+            let currentScale = 1;
+            let isDrawingLine = false;
+            let tempLine = null;
+            let startNode = null;
+            
+            // Node colors and default settings
+            let currentNodeColor = '#64B5F6';
+            
+            // Node type icons/emojis
+            const nodeTypes = {
+                'supplier': '🏭 Supplier',
+                'warehouse': '🏢 Warehouse',
+                'distribution': '🔄 Distribution',
+                'transport': '🚚 Transport',
+                'customer': '🛒 Customer',
+                'processing': '⚙️ Processing',
+                'customs': '🛃 Customs'
+            };
+            
+            // Node creation buttons
+            Object.keys(nodeTypes).forEach(type => {
+                document.getElementById(`add-${type}`).addEventListener('click', () => {
+                    createNode(type);
+                    saveState();
+                });
+            });
+            
+            // Create node function
+            function createNode(type) {
+                const node = document.createElement('div');
+                node.className = 'node';
+                node.dataset.type = type;
+                node.style.backgroundColor = currentNodeColor;
+                node.style.left = '100px';
+                node.style.top = '100px';
+                node.textContent = nodeTypes[type];
+                node.dataset.id = Date.now().toString();
+                
+                canvas.appendChild(node);
+                nodes.push(node);
+                
+                // Make node draggable
+                node.addEventListener('mousedown', startDrag);
+                
+                // Allow selection
+                node.addEventListener('click', (e) => {
+                    if (!e.ctrlKey && !e.metaKey) {
+                        // Deselect all other nodes if not multi-selecting
+                        selectedNodes.forEach(n => n.classList.remove('selected'));
+                        selectedNodes = [];
+                    }
+                    
+                    if (!node.classList.contains('selected')) {
+                        node.classList.add('selected');
+                        selectedNodes.push(node);
+                    } else {
+                        node.classList.remove('selected');
+                        selectedNodes = selectedNodes.filter(n => n !== node);
+                    }
+                    e.stopPropagation();
+                });
+                
+                return node;
+            }
+            
+            // Drag and drop functionality
+            function startDrag(e) {
+                draggedNode = this;
+                const rect = draggedNode.getBoundingClientRect();
+                offsetX = (e.clientX - rect.left) / currentScale;
+                offsetY = (e.clientY - rect.top) / currentScale;
+                
+                document.addEventListener('mousemove', moveDrag);
+                document.addEventListener('mouseup', stopDrag);
+                e.preventDefault();
+            }
+            
+            function moveDrag(e) {
+                if (draggedNode) {
+                    const canvasRect = canvas.getBoundingClientRect();
+                    let newX = (e.clientX - canvasRect.left) / currentScale - offsetX;
+                    let newY = (e.clientY - canvasRect.top) / currentScale - offsetY;
+                    
+                    // Ensure the node stays within the canvas
+                    newX = Math.max(0, Math.min(canvas.scrollWidth / currentScale - draggedNode.offsetWidth, newX));
+                    newY = Math.max(0, Math.min(canvas.scrollHeight / currentScale - draggedNode.offsetHeight, newY));
+                    
+                    draggedNode.style.left = newX + 'px';
+                    draggedNode.style.top = newY + 'px';
+                    
+                    // Update connections
+                    updateConnections();
+                }
+            }
+            
+            function stopDrag() {
+                if (draggedNode) {
+                    saveState();
+                    draggedNode = null;
+                    document.removeEventListener('mousemove', moveDrag);
+                    document.removeEventListener('mouseup', stopDrag);
+                }
+            }
+            
+            // Connection functionality
+            document.getElementById('connect-btn').addEventListener('click', () => {
+                if (selectedNodes.length === 2) {
+                    connectNodes(selectedNodes[0], selectedNodes[1]);
+                    saveState();
+                } else {
+                    alert('Please select exactly 2 nodes to connect');
+                }
+            });
+            
+            function connectNodes(source, target) {
+                const connection = {
+                    source: source.dataset.id,
+                    target: target.dataset.id
+                };
+                
+                // Check if connection already exists
+                const exists = connections.some(c => 
+                    (c.source === connection.source && c.target === connection.target) ||
+                    (c.source === connection.target && c.target === connection.source)
+                );
+                
+                if (!exists) {
+                    connections.push(connection);
+                    drawConnections();
+                }
+            }
+            
+            function drawConnections() {
+                // Remove all existing connection lines
+                document.querySelectorAll('.connector').forEach(el => el.remove());
+                
+                // Draw each connection
+                connections.forEach(conn => {
+                    const source = document.querySelector(`.node[data-id="${conn.source}"]`);
+                    const target = document.querySelector(`.node[data-id="${conn.target}"]`);
+                    
+                    if (source && target) {
+                        drawLine(source, target);
+                    }
+                });
+            }
+            
+            function updateConnections() {
+                drawConnections();
+            }
+            
+            function drawLine(source, target) {
+                const sourceRect = source.getBoundingClientRect();
+                const targetRect = target.getBoundingClientRect();
+                const canvasRect = canvas.getBoundingClientRect();
+                
+                // Calculate center points
+                const sourceX = (sourceRect.left + sourceRect.width / 2 - canvasRect.left) / currentScale;
+                const sourceY = (sourceRect.top + sourceRect.height / 2 - canvasRect.top) / currentScale;
+                const targetX = (targetRect.left + targetRect.width / 2 - canvasRect.left) / currentScale;
+                const targetY = (targetRect.top + targetRect.height / 2 - canvasRect.top) / currentScale;
+                
+                // Create SVG line
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                line.classList.add('connector');
+                line.setAttribute('width', '100%');
+                line.setAttribute('height', '100%');
+                line.style.position = 'absolute';
+                line.style.top = '0';
+                line.style.left = '0';
+                line.style.pointerEvents = 'none';
+                
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', `M${sourceX},${sourceY} L${targetX},${targetY}`);
+                path.setAttribute('stroke', '#333');
+                path.setAttribute('stroke-width', '2');
+                path.setAttribute('marker-end', 'url(#arrowhead)');
+                
+                // Add arrowhead marker
+                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                marker.setAttribute('id', 'arrowhead');
+                marker.setAttribute('markerWidth', '10');
+                marker.setAttribute('markerHeight', '7');
+                marker.setAttribute('refX', '9');
+                marker.setAttribute('refY', '3.5');
+                marker.setAttribute('orient', 'auto');
+                
+                const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                polygon.setAttribute('points', '0 0, 10 3.5, 0 7');
+                polygon.setAttribute('fill', '#333');
+                
+                marker.appendChild(polygon);
+                defs.appendChild(marker);
+                line.appendChild(defs);
+                line.appendChild(path);
+                canvas.appendChild(line);
+            }
+            
+            // Color change functionality
+            document.querySelectorAll('.color-option').forEach(option => {
+                option.addEventListener('click', () => {
+                    currentNodeColor = option.dataset.color;
+                    
+                    // Apply to selected nodes
+                    if (selectedNodes.length > 0) {
+                        selectedNodes.forEach(node => {
+                            node.style.backgroundColor = currentNodeColor;
+                        });
+                        saveState();
+                    }
+                });
+            });
+            
+            // Delete functionality
+            document.getElementById('delete-btn').addEventListener('click', () => {
+                if (selectedNodes.length > 0) {
+                    selectedNodes.forEach(node => {
+                        const nodeId = node.dataset.id;
+                        
+                        // Remove associated connections
+                        connections = connections.filter(conn => 
+                            conn.source !== nodeId && conn.target !== nodeId
+                        );
+                        
+                        // Remove node from DOM
+                        node.remove();
+                        
+                        // Remove from nodes array
+                        nodes = nodes.filter(n => n !== node);
+                    });
+                    
+                    selectedNodes = [];
+                    drawConnections();
+                    saveState();
+                }
+            });
+            
+            // Clear selection when clicking on canvas
+            canvas.addEventListener('click', (e) => {
+                if (e.target === canvas) {
+                    selectedNodes.forEach(node => node.classList.remove('selected'));
+                    selectedNodes = [];
+                }
+            });
+            
+            // Zoom functionality
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                currentScale = Math.min(currentScale + 0.1, 3);
+                updateZoom();
+            });
+            
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                currentScale = Math.max(currentScale - 0.1, 0.5);
+                updateZoom();
+            });
+            
+            document.getElementById('zoom-reset').addEventListener('click', () => {
+                currentScale = 1;
+                updateZoom();
+            });
+            
+            function updateZoom() {
+                canvas.style.transform = `scale(${currentScale})`;
+                canvas.style.transformOrigin = 'top left';
+                updateConnections();
+            }
+            
+            // Handle mousewheel zoom
+            canvas.addEventListener('wheel', (e) => {
+                if (e.ctrlKey) {
+                    e.preventDefault();
+                    if (e.deltaY < 0) {
+                        currentScale = Math.min(currentScale + 0.05, 3);
+                    } else {
+                        currentScale = Math.max(currentScale - 0.05, 0.5);
+                    }
+                    updateZoom();
+                }
+            });
+            
+            // Undo/Redo functionality
+            function saveState() {
+                const state = {
+                    nodes: Array.from(nodes).map(node => ({
+                        id: node.dataset.id,
+                        type: node.dataset.type,
+                        left: node.style.left,
+                        top: node.style.top,
+                        color: node.style.backgroundColor
+                    })),
+                    connections: [...connections]
+                };
+                
+                actionHistory.push(JSON.stringify(state));
+                redoStack = []; // Clear redo stack on new action
+            }
+            
+            document.getElementById('undo-btn').addEventListener('click', () => {
+                if (actionHistory.length > 1) {
+                    redoStack.push(actionHistory.pop()); // Move current state to redo stack
+                    const prevState = JSON.parse(actionHistory[actionHistory.length - 1]);
+                    loadState(prevState);
+                }
+            });
+            
+            document.getElementById('redo-btn').addEventListener('click', () => {
+                if (redoStack.length > 0) {
+                    const nextState = JSON.parse(redoStack.pop());
+                    actionHistory.push(JSON.stringify(nextState));
+                    loadState(nextState);
+                }
+            });
+            
+            function loadState(state) {
+                // Clear current canvas
+                nodes.forEach(node => node.remove());
+                document.querySelectorAll('.connector').forEach(conn => conn.remove());
+                
+                nodes = [];
+                selectedNodes = [];
+                
+                // Recreate nodes
+                state.nodes.forEach(nodeData => {
+                    const node = document.createElement('div');
+                    node.className = 'node';
+                    node.dataset.type = nodeData.type;
+                    node.dataset.id = nodeData.id;
+                    node.style.backgroundColor = nodeData.color;
+                    node.style.left = nodeData.left;
+                    node.style.top = nodeData.top;
+                    node.textContent = nodeTypes[nodeData.type];
+                    
+                    canvas.appendChild(node);
+                    nodes.push(node);
+                    
+                    // Make node draggable
+                    node.addEventListener('mousedown', startDrag);
+                    
+                    // Allow selection
+                    node.addEventListener('click', (e) => {
+                        if (!e.ctrlKey && !e.metaKey) {
+                            selectedNodes.forEach(n => n.classList.remove('selected'));
+                            selectedNodes = [];
+                        }
+                        
+                        if (!node.classList.contains('selected')) {
+                            node.classList.add('selected');
+                            selectedNodes.push(node);
+                        } else {
+                            node.classList.remove('selected');
+                            selectedNodes = selectedNodes.filter(n => n !== node);
+                        }
+                        e.stopPropagation();
+                    });
+                });
+                
+                // Recreate connections
+                connections = state.connections;
+                drawConnections();
+            }
+            
+            // Export functionality
+            document.getElementById('save-png').addEventListener('click', exportAsPNG);
+            document.getElementById('save-pdf').addEventListener('click', exportAsPDF);
+            
+            function exportAsPNG() {
+                // Temporarily hide zoom controls
+                const zoomControls = document.querySelector('.zoom-controls');
+                zoomControls.style.display = 'none';
+                
+                // Save original scale
+                const originalScale = currentScale;
+                currentScale = 1;
+                updateZoom();
+                
+                html2canvas(canvas).then(function(canvas) {
+                    // Restore zoom controls and scale
+                    zoomControls.style.display = 'flex';
+                    currentScale = originalScale;
+                    updateZoom();
+                    
+                    const link = document.createElement('a');
+                    link.download = 'logistics-workflow.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                });
+            }
+            
+            function exportAsPDF() {
+                // Temporarily hide zoom controls
+                const zoomControls = document.querySelector('.zoom-controls');
+                zoomControls.style.display = 'none';
+                
+                // Save original scale
+                const originalScale = currentScale;
+                currentScale = 1;
+                updateZoom();
+                
+                html2canvas(canvas).then(function(canvas) {
+                    // Restore zoom controls and scale
+                    zoomControls.style.display = 'flex';
+                    currentScale = originalScale;
+                    updateZoom();
+                    
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new window.jspdf.jsPDF({
+                        orientation: 'landscape',
+                        unit: 'px'
+                    });
+                    
+                    const imgWidth = canvas.width;
+                    const imgHeight = canvas.height;
+                    const ratio = Math.min(pdf.internal.pageSize.getWidth() / imgWidth, pdf.internal.pageSize.getHeight() / imgHeight);
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth * ratio, imgHeight * ratio);
+                    pdf.save('logistics-workflow.pdf');
+                });
+            }
+            
+            // Initialize first state
+            saveState();
+        });
+    </script>
+</body>
+</html>
