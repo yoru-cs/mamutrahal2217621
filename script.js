@@ -78,3 +78,35 @@ function draw() {
 }
 
 draw();
+// Add this to your script.js file
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Get the modal elements
+    const modal = document.getElementById('assignment1Modal');
+    const button = document.getElementById('assignment1');
+    const closeButton = document.querySelector('.close-button');
+    
+    // Open the modal when the Assignment 1 button is clicked
+    button.addEventListener('click', function() {
+        modal.style.display = 'block';
+    });
+    
+    // Close the modal when the X is clicked
+    closeButton.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+    
+    // Close the modal when clicking outside of it
+    window.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+    
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal.style.display === 'block') {
+            modal.style.display = 'none';
+        }
+    });
+});
