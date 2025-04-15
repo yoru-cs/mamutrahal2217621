@@ -101,3 +101,19 @@ body {
     z-index: -1;
     background-color: black;
 }
+.glow-button {
+    text-decoration: none;   /* Remove the underline */
+    color: white;            /* Keep text color white */
+    background-color: #444;  /* Or your preferred background */
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    box-shadow: 0 0 10px #fff;
+    display: inline-block;   /* Needed for <a> to behave like a block/button */
+    font-weight: bold;
+    transition: 0.3s;
+}
+
+.glow-button:hover {
+    box-shadow: 0 0 20px #0ff, 0 0 30px #0ff; /* Add your glow effect */
+    transform: scale(1.05);
+}
