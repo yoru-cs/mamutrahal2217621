@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TSP Game</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    /* ───── Base ───── */
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #87ceeb;
+    }
+
+    /* ───── Fancy score badge (now hidden) ───── */
+    #scoreboard {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 24px;
+      border-radius: 40px;
+      background: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(8px);
+      font: 600 22px/1 "Segoe UI", Arial, sans-serif;
+      color: #000;
+      z-index: 11;
+      display: none;
+    }
+    #score {
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(
+        135deg,
+        #ffb300 0%,
+        #ffeb3b 60%,
+        #fffde7 100%
+      );
+      -webkit-background-clip: text;
+      color: transparent;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+      transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    #score.bump {
+      transform: scale(1.35);
+    }
+
+    /* ───── Level navigation buttons ───── */
+    #levelNav {
+      position: fixed;
+      top: 58px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      z-index: 11;
+    }
+    .levelBtn {
+      padding: 6px 14px;
+      border: 0;
+      border-radius: 4px;
+      background: #ff7043;
+      color: #fff;
+      font: bold 15px Arial;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      transition: background 0.18s;
+    }
+    .levelBtn:hover:not([disabled]) {
+      background: #f4511e;
+    }
+    .levelBtn[disabled] {
+      background: #9e9e9e;
+      cursor: not-allowed;
+    }
+
+    /* ───── Footer info panel ───── */
+    #ui {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      padding: 8px 26px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      font-size: 14px;
+      backdrop-filter: blur(6px);
+      z-index: 10;
+      width: 68vw;
+      max-width: 850px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+    #ui p {
+      margin: 0;
+    }
+
+    /* ───── Control button bar ───── */
+    #controls {
+      position: fixed;
+      bottom: 118px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 10;
+    }
+    button {
+      padding: 4px 12px;
+      border: 0;
+      border-radius: 4px;
+      background: #2196f3;
+      color: #fff;
+      font: bold 13px Arial;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      transition: background 0.18s;
+    }
+    button:hover {
+      background: #1e88e5;
+    }
+
+    /* ───── Tooltip / fail msg ───── */
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      background: #212121;
+      color: #fff;
+      padding: 4px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 11;
+      white-space: nowrap;
+    }
+    #msg {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      font-size: 48px;
+      font-weight: bold;
+      color: #ff5252;
+      text-shadow: 0 0 10px #000;
+      transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+      z-index: 12;
+    }
+    #msg.show {
+      transform: translate(-50%, -50%) scale(1);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="scoreboard">Score <span id="score">0</span></div>
+
+  <div id="levelNav">
+    <button class="levelBtn" data-level="0">Level&nbsp;1</button>
+    <button class="levelBtn" data-level="1" disabled>Level&nbsp;2</button>
+    <button class="levelBtn" data-level="2" disabled>Level&nbsp;3</button>
+  </div>
+
+  <div id="controls">
+    <button id="reset">Restart</button>
+    <button id="undo">Undo</button>
+  </div>
+
+  <div id="ui">
+    <p>
+      Visit each warehouse once and come back to the starting point, while
+      minimizing gas expenditure.
+    </p>
+    <p>
+      Route: <span id="route"></span> | Gas: <span id="cost">0</span> | Optimal:
+      <span id="optCost">0</span>
+    </p>
+  </div>
+
+  <div id="tooltip"></div>
+  <div id="msg">TRY&nbsp;AGAIN!</div>
+
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js?module";
+    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js?module";
+    import { Line2 } from "https://unpkg.com/three@0.160.0/examples/jsm/lines/Line2.js?module";
+    import { LineMaterial } from "https://unpkg.com/three@0.160.0/examples/jsm/lines/LineMaterial.js?module";
+    import { LineGeometry } from "https://unpkg.com/three@0.160.0/examples/jsm/lines/LineGeometry.js?module";
+
+    /* --- Color Constants --- */
+    const START_COLOR = 0x03a9f4;
+    const DEFAULT_COLOR = 0x4caf50;
+    const VISITED_COLOR = 0xffc107;
+    const LAST_COLOR = 0xff5252;
+
+    /* --- Game Definitions --- */
+    const levels = [
+      {
+        NODE_COUNT: 6,
+        radius: 15,
+        irregular: [1, 0.85, 1.05, 0.92, 1.18, 0.97],
+        costs: [
+          [0, 62, 110, 130, 66, 120],
+          [62, 0, 105, 65, 115, 125],
+          [110, 105, 0, 60, 107, 120],
+          [130, 65, 60, 0, 140, 102],
+          [66, 115, 107, 140, 0, 64],
+          [120, 125, 120, 102, 64, 0],
+        ],
+        OPT_ROUTE: [0, 1, 3, 2, 5, 4],
+      },
+      {
+        NODE_COUNT: 7,
+        radius: 17,
+        irregular: [1, 0.9, 1.1, 0.8, 1.2, 0.95, 1.05],
+        costs: [
+          [0, 65, 95, 85, 75, 120, 110],
+          [65, 0, 70, 115, 90, 80, 84],
+          [95, 70, 0, 75, 70, 65, 140],
+          [85, 115, 75, 0, 115, 90, 85],
+          [75, 90, 70, 115, 0, 120, 100],
+          [120, 80, 65, 90, 120, 0, 85],
+          [110, 84, 140, 85, 100, 85, 0],
+        ],
+        OPT_ROUTE: [0, 4, 2, 5, 3, 6, 1],
+      },
+      {
+        NODE_COUNT: 8,
+        radius: 19,
+        irregular: [1, 0.85, 1.15, 0.9, 1.2, 0.8, 1.05, 0.95],
+        costs: [
+          [0, 90, 95, 80, 100, 66, 105, 110],
+          [90, 0, 85, 120, 68, 115, 130, 70],
+          [95, 85, 0, 82, 108, 95, 85, 75],
+          [80, 120, 82, 0, 112, 98, 62, 105],
+          [100, 68, 108, 112, 0, 63, 120, 89],
+          [66, 115, 95, 98, 63, 0, 91, 108],
+          [105, 130, 85, 62, 120, 91, 0, 102],
+          [110, 70, 75, 105, 89, 108, 102, 0],
+        ],
+        OPT_ROUTE: [0, 3, 6, 2, 7, 1, 4, 5],
+      },
+    ];
+
+    let currentLevel = 0,
+      maxLevelReached = 0;
+
+    /* --- Three.js Setup --- */
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.Fog(0x87ceeb, 85, 160);
+
+    const camera = new THREE.PerspectiveCamera(
+      60,
+      innerWidth / innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 22, 38);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+    controls.target.set(0, 9, 0);
+
+    /* ---------- Lighting & Skyline  (REPLACE THIS WHOLE BLOCK) ---------- */
+scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+const dl = new THREE.DirectionalLight(0xffffff, 0.9);
+dl.position.set(14, 30, 10);
+scene.add(dl);
+
+/* ── Two-band skyline | nudged farther out  ────────────────────────────
+   • Inner band: 35–50 units  (was 28–40)   → leaves clear view space.
+   • Outer band: 50–95 units  (was 40–90)   → keeps city depth.
+   • Counts stay 35 + 70 ≈ original density.                              */
+const skyline = new THREE.Group();
+
+addBuildings( 35, 35, 50);  // inner band (offset farther out)
+addBuildings( 70, 50, 95);  // outer band (slightly extended)
+
+scene.add(skyline);
+
+/* helper: random scatter of “count” buildings inside [rMin, rMax] shell */
+function addBuildings(count, rMin, rMax) {
+  for (let i = 0; i < count; i++) {
+    const w = 2 + Math.random() * 4,
+          d = 2 + Math.random() * 4,
+          h = 8 + Math.random() * 27;
+
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d),
+      new THREE.MeshStandardMaterial({ color: 0x1a237e, flatShading: true })
+    );
+
+    const radius = rMin + Math.random() * (rMax - rMin);
+    const angle  = Math.random() * Math.PI * 2;
+    mesh.position.set(
+      Math.cos(angle) * radius,
+      h / 2 - 1,
+      Math.sin(angle) * radius
+    );
+
+    skyline.add(mesh);
+  }
+}
+/* ---------- Skyline block END -------------------------------------- */
+
+    /* --- Game State Variables --- */
+    let mapGroup,
+      positions = [],
+      nodes = [],
+      edges = [];
+    let route = [],
+      gas = 0,
+      closed = false,
+      truck = null,
+      move = null;
+    let score = 0,
+      nextIndex = 0,
+      currentWH = -1;
+
+    /* --- UI Elements --- */
+    const scoreEl = document.getElementById("score");
+    const routeEl = document.getElementById("route");
+    const costEl = document.getElementById("cost");
+    const optCostEl = document.getElementById("optCost");
+    const tooltip = document.getElementById("tooltip");
+    const msg = document.getElementById("msg");
+    const navBtns = [...document.querySelectorAll(".levelBtn")];
+
+    /* --- Utility Functions --- */
+    const SPEED = 25;
+    const RES = new THREE.Vector2(innerWidth, innerHeight);
+
+    function key(a, b) {
+      return a < b ? `${a}-${b}` : `${b}-${a}`;
+    }
+    function onMap(v) {
+      return v
+        .clone()
+        .add(mapGroup.position)
+        .setY(mapGroup.position.y + 0.1);
+    }
+    function bumpScore() {
+      score++;
+      scoreEl.textContent = score;
+      scoreEl.classList.add("bump");
+      setTimeout(() => scoreEl.classList.remove("bump"), 250);
+    }
+    function tint(i, c) {
+      nodes[i].children.forEach((o) => o.material?.color.set(c));
+    }
+    function setGate(i, open) {
+      const g = nodes[i].userData.gate;
+      g.material.color.set(open ? 0x8d6e63 : 0x3e2723);
+      g.userData.targetY = open ? (i === 0 ? 2.5 : 2.0) : i === 0 ? 0.8 : 0.6;
+    }
+    function moveTruck(a, b) {
+      move = {
+        from: onMap(positions[a]),
+        to: onMap(positions[b]),
+        dur: positions[a].distanceTo(positions[b]) / SPEED,
+        el: 0,
+        dest: b,
+      };
+      truck.position.copy(move.from);
+    }
+
+    /* --- Optimal-route gas pre-calc --- */
+    function optimalGas(levelIdx) {
+      const { OPT_ROUTE: R, costs: C, NODE_COUNT: N } = levels[levelIdx];
+      let g = 0;
+      for (let i = 0; i < N; i++) {
+        const a = R[i],
+          b = R[(i + 1) % N];
+        g += C[a][b];
+      }
+      return g;
+    }
+
+    /* --- Route Logic --- */
+    function addNode(i) {
+      /* revert previous last (if not start) to yellow */
+      if (currentWH >= 0 && currentWH !== 0) tint(currentWH, VISITED_COLOR);
+
+      /* gas + movement */
+      if (route.length) {
+        const prev = route.at(-1);
+        gas += levels[currentLevel].costs[prev][i];
+        costEl.textContent = gas.toFixed(2);
+        moveTruck(prev, i);
+
+        if (
+          i ===
+          levels[currentLevel].OPT_ROUTE[
+            (nextIndex + 1) % levels[currentLevel].NODE_COUNT
+          ]
+        ) {
+          nextIndex++;
+          bumpScore();
+        }
+      } else {
+        nextIndex = 0;
+      }
+
+      /* push */
+      route.push(i);
+      routeEl.textContent = route.join(" ➜ ");
+
+      /* new last coloring */
+      if (i !== 0) tint(i, LAST_COLOR);
+
+      currentWH = i;
+    }
+
+    function undoLast() {
+      if (move || !route.length) return;
+
+      /* remove last node */
+      const last = route.pop();
+      setGate(last, false);
+      tint(last, last === 0 ? START_COLOR : DEFAULT_COLOR);
+
+      /* score adjust */
+      if (
+        last ===
+          levels[currentLevel].OPT_ROUTE[
+            nextIndex % levels[currentLevel].NODE_COUNT
+          ] &&
+        score > 0
+      ) {
+        score--;
+        scoreEl.textContent = score;
+        nextIndex--;
+      }
+
+      /* gas & truck reset */
+      if (route.length) {
+        const prev = route.at(-1);
+        gas -= levels[currentLevel].costs[prev][last];
+        costEl.textContent = gas.toFixed(2);
+        truck.position.copy(onMap(positions[prev]));
+        currentWH = prev;
+
+        /* color prev as last (if not start) */
+        if (prev !== 0) tint(prev, LAST_COLOR);
+      } else {
+        gas = 0;
+        costEl.textContent = "0";
+        if (truck) {
+          scene.remove(truck);
+          truck = null;
+        }
+        currentWH = -1;
+      }
+
+      closed = false;
+      routeEl.textContent = route.join(" ➜ ");
+    }
+
+    /* --- Mouse Interaction Overlay --- */
+    const ray = new THREE.Raycaster();
+    ray.params.Line.threshold = 0.6;
+    const mouse = new THREE.Vector2();
+    let overlayLine = null,
+      hoveredEdge = null,
+      lastPointer = performance.now();
+    const OVER_MAT = new LineMaterial({
+      color: 0xffff00,
+      linewidth: 0,
+      transparent: true,
+      opacity: 1,
+    });
+    OVER_MAT.resolution.copy(RES);
+
+    function showOverlay(a, b) {
+      if (!overlayLine) {
+        overlayLine = new Line2(new LineGeometry(), OVER_MAT);
+        overlayLine.computeLineDistances();
+        scene.add(overlayLine);
+      }
+      overlayLine.geometry.setPositions([
+        a.x,
+        a.y,
+        a.z,
+        b.x,
+        b.y,
+        b.z,
+      ]);
+      overlayLine.visible = true;
+    }
+    function hideOverlay() {
+      if (overlayLine) overlayLine.visible = false;
+      hoveredEdge = null;
+    }
+
+    window.addEventListener("mousemove", (e) => {
+      mouse.x = (e.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+      ray.setFromCamera(mouse, camera);
+      const hit = ray.intersectObjects(edges, false);
+      lastPointer = performance.now();
+
+      if (hit.length) {
+        const ed = hit[0].object;
+        if (ed !== hoveredEdge) {
+          hoveredEdge = ed;
+          showOverlay(
+            positions[ed.userData.i],
+            positions[ed.userData.j]
+          );
+        }
+        tooltip.textContent = ed.userData.gas.toFixed(2) + " gas";
+        tooltip.style.left = e.clientX + 8 + "px";
+        tooltip.style.top = e.clientY + 8 + "px";
+        tooltip.style.opacity = 1;
+      } else {
+        tooltip.style.opacity = 0;
+      }
+    });
+
+    function updateOverlay() {
+      if (!overlayLine) return;
+      const t = performance.now() - lastPointer < 150 ? 0.02 : 0;
+      OVER_MAT.linewidth += (t - OVER_MAT.linewidth) * 0.15;
+      if (t === 0 && OVER_MAT.linewidth < 0.001) hideOverlay();
+    }
+
+    /* --- Burst Effects --- */
+    const conf = [],
+      deb = [];
+    function burst(ok = true) {
+      const arr = ok ? conf : deb;
+      const cols = ok
+        ? [0xffeb3b, 0x2196f3, 0x8bc34a, 0xff9800]
+        : [0xff5252, 0xb71c1c, 0x9e9e9e];
+      for (let i = 0; i < 120; i++) {
+        const m = new THREE.Mesh(
+          new THREE.PlaneGeometry(0.4, 0.8),
+          new THREE.MeshBasicMaterial({
+            color: cols[(Math.random() * cols.length) | 0],
+            side: THREE.DoubleSide,
+            transparent: true,
+          })
+        );
+        m.position.set(0, mapGroup.position.y + 5, 0);
+        m.userData = {
+          v: new THREE.Vector3(
+            (Math.random() - 0.5) * 4,
+            ok ? Math.random() * 6 + 3 : -(Math.random() * 6 + 3),
+            (Math.random() - 0.5) * 4
+          ),
+          life: 2 + Math.random() * 1.2,
+        };
+        scene.add(m);
+        arr.push(m);
+      }
+    }
+    function popMsg(txt = "TRY AGAIN!") {
+      msg.textContent = txt;
+      msg.classList.add("show");
+      setTimeout(() => {
+        msg.classList.remove("show");
+        msg.textContent = "TRY AGAIN!";
+      }, 1000);
+    }
+    function fail() {
+      burst(false);
+      setTimeout(() => reset(false), 1200);
+    }
+
+    /* --- Evaluation --- */
+    function evaluate() {
+      /* 1) Reject any non-Hamiltonian or non-closed route */
+      if (
+        route.length !== levels[currentLevel].NODE_COUNT + 1 ||
+        route[0] !== route.at(-1)
+      ) {
+        popMsg();
+        fail();
+        return;
+      }
+
+      /* 2) edges actually traversed */
+      const edgesPlayed = new Set();
+      for (let k = 1; k < route.length; k++)
+        edgesPlayed.add(key(route[k - 1], route[k]));
+
+      /* 3) edges in optimal cycle */
+      const optSet = new Set(
+        levels[currentLevel].OPT_ROUTE.map((v, i) =>
+          key(
+            v,
+            levels[currentLevel].OPT_ROUTE[
+              (i + 1) % levels[currentLevel].NODE_COUNT
+            ]
+          )
+        )
+      );
+
+      /* 4) win */
+      if (
+        edgesPlayed.size === optSet.size &&
+        [...optSet].every((x) => edgesPlayed.has(x))
+      ) {
+        burst(true);
+        maxLevelReached = Math.max(maxLevelReached, currentLevel);
+        updateLevelButtons();
+        setTimeout(() => {
+          if (currentLevel < levels.length - 1) {
+            currentLevel++;
+            maxLevelReached = Math.max(maxLevelReached, currentLevel);
+            updateLevelButtons();
+            reset(false);
+          }
+        }, 1500);
+      } else {
+        popMsg();
+        fail();
+      }
+    }
+
+    /* --- Input Handlers --- */
+    window.addEventListener("click", (e) => {
+      const uiRect = document.getElementById("ui").getBoundingClientRect();
+      const ctrlRect =
+        document.getElementById("controls").getBoundingClientRect();
+      const navRect =
+        document.getElementById("levelNav").getBoundingClientRect();
+
+      const insideUI =
+        e.clientX > uiRect.left &&
+        e.clientX < uiRect.right &&
+        e.clientY > uiRect.top &&
+        e.clientY < uiRect.bottom;
+      const insideCtrl =
+        e.clientX > ctrlRect.left &&
+        e.clientX < ctrlRect.right &&
+        e.clientY > ctrlRect.top &&
+        e.clientY < ctrlRect.bottom;
+      const insideNav =
+        e.clientX > navRect.left &&
+        e.clientX < navRect.right &&
+        e.clientY > navRect.top &&
+        e.clientY < navRect.bottom;
+
+      if (insideUI || insideCtrl || insideNav || closed || move) return;
+
+      mouse.x = (e.clientX / innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+      ray.setFromCamera(mouse, camera);
+
+      const hit = ray.intersectObjects(nodes, true);
+      if (!hit.length) return;
+
+      const idx = hit[0].object.parent.userData.index;
+
+      if (!route.length) {
+        if (idx !== levels[currentLevel].OPT_ROUTE[0]) {
+          popMsg();
+          return;
+        }
+        addNode(idx);
+        /* spawn truck */
+        truck = truckModel();
+        truck.position.copy(onMap(positions[idx]));
+        scene.add(truck);
+        setGate(idx, true);
+        return;
+      }
+
+      if (route.includes(idx)) {
+        if (
+          idx === route[0] &&
+          route.length === levels[currentLevel].NODE_COUNT
+        ) {
+          addNode(idx);
+          closed = true;
+          moveTruck(route.at(-2), idx);
+          return;
+        } else {
+          popMsg();
+          return;
+        }
+      } else {
+        addNode(idx);
+      }
+    });
+
+    /* --- Restart & Undo --- */
+    function reset(init = true) {
+      /* clean previous */
+      if (mapGroup) scene.remove(mapGroup);
+      if (truck) {
+        scene.remove(truck);
+        truck = null;
+      }
+      [...conf, ...deb].forEach((p) => scene.remove(p));
+      conf.length = deb.length = 0;
+      tooltip.style.opacity = 0;
+
+      /* state reset */
+      route = [];
+      gas = 0;
+      closed = false;
+      move = null;
+      score = 0;
+      nextIndex = 0;
+      currentWH = -1;
+
+      scoreEl.textContent = "0";
+      routeEl.textContent = "";
+      costEl.textContent = "0";
+      optCostEl.textContent = optimalGas(currentLevel).toFixed(2);
+
+      /* rebuild map */
+      initLevel();
+
+      /* gates closed after initial blink */
+      nodes.forEach((n, i) => {
+        const g = n.userData.gate;
+        const openY = i === 0 ? 2.5 : 2.0;
+        g.position.y = openY;
+        g.userData.targetY = openY;
+      });
+      setTimeout(() => nodes.forEach((_, i) => setGate(i, false)), 20);
+    }
+
+    document
+      .getElementById("reset")
+      .addEventListener("click", () => reset(false));
+    document.getElementById("undo").addEventListener("click", undoLast);
+
+    /* Level button logic */
+    function updateLevelButtons() {
+      navBtns.forEach((btn) => {
+        const l = parseInt(btn.dataset.level);
+        btn.disabled = l > maxLevelReached;
+      });
+    }
+    document.getElementById("levelNav").addEventListener("click", (e) => {
+      if (!e.target.classList.contains("levelBtn")) return;
+      const lvl = parseInt(e.target.dataset.level);
+      if (lvl <= maxLevelReached) {
+        currentLevel = lvl;
+        reset(false);
+      } else {
+        popMsg("NOT THERE YET!");
+      }
+    });
+
+    /* --- Scene Initialization & Animation --- */
+    function warehouse() {
+      const g = new THREE.Group();
+      g.add(
+        new THREE.Mesh(
+          new THREE.BoxGeometry(3, 2, 3),
+          new THREE.MeshStandardMaterial({ color: DEFAULT_COLOR })
+        )
+      );
+      const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(2.6, 1.4, 4),
+        new THREE.MeshStandardMaterial({ color: 0x795548 })
+      );
+      roof.position.y = 1.7;
+      roof.rotation.y = Math.PI / 4;
+      g.add(roof);
+
+      const gate = new THREE.Mesh(
+        new THREE.BoxGeometry(1.6, 1.2, 0.15),
+        new THREE.MeshStandardMaterial({ color: 0x3e2723 })
+      );
+      gate.position.set(0, 0.6, 1.57);
+      gate.userData = { targetY: 0.6 };
+      g.add(gate);
+
+      g.userData.gate = gate;
+      return g;
+    }
+
+    function startWarehouse() {
+      const g = new THREE.Group();
+      g.add(
+        new THREE.Mesh(
+          new THREE.BoxGeometry(4.5, 3, 4.5),
+          new THREE.MeshStandardMaterial({ color: START_COLOR })
+        )
+      );
+      const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(4, 2, 4),
+        new THREE.MeshStandardMaterial({ color: 0x01579b })
+      );
+      roof.position.y = 2.5;
+      roof.rotation.y = Math.PI / 4;
+      g.add(roof);
+
+      const gate = new THREE.Mesh(
+        new THREE.BoxGeometry(2.2, 1.6, 0.2),
+        new THREE.MeshStandardMaterial({ color: 0x3e2723 })
+      );
+      gate.position.set(0, 0.8, 2.35);
+      gate.userData = { targetY: 0.8 };
+      g.add(gate);
+
+      g.userData.gate = gate;
+      return g;
+    }
+
+    function truckModel() {
+      const g = new THREE.Group();
+      g.add(
+        new THREE.Mesh(
+          new THREE.BoxGeometry(2, 1.3, 1.8),
+          new THREE.MeshStandardMaterial({ color: 0xef5350 })
+        )
+      );
+      const cab = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 1.1, 1.8),
+        new THREE.MeshStandardMaterial({ color: 0xffeb3b })
+      );
+      cab.position.set(1, 0.7, 0);
+      g.add(cab);
+
+      const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.5, 20),
+        wheelMat = new THREE.MeshStandardMaterial({ color: 0x333 });
+      [-0.8, 0.8].forEach((z) =>
+        [-0.8, 0.8].forEach((x) => {
+          const w = new THREE.Mesh(wheelGeo, wheelMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(x, 0.3, z);
+          g.add(w);
+        })
+      );
+
+      /* smaller so it fits entirely inside */
+      g.scale.set(0.7, 0.7, 0.7);
+      return g;
+    }
+
+    function initLevel() {
+      if (mapGroup) scene.remove(mapGroup);
+
+      mapGroup = new THREE.Group();
+      mapGroup.position.y = 8;
+      scene.add(mapGroup);
+
+      positions = [];
+      nodes = [];
+      edges = [];
+
+      const def = levels[currentLevel],
+        N = def.NODE_COUNT;
+
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2;
+        const rad = def.radius * def.irregular[i];
+        const p = new THREE.Vector3(
+          Math.cos(a) * rad,
+          0,
+          Math.sin(a) * rad
+        );
+        positions.push(p);
+
+        const w = i === 0 ? startWarehouse() : warehouse();
+        w.position.copy(p);
+        w.userData.index = i;
+        mapGroup.add(w);
+        nodes.push(w);
+      }
+
+      /* roads */
+      const roadMat = new THREE.MeshStandardMaterial({ color: 0x555 });
+      for (let i = 0; i < N; i++) {
+        for (let j = i + 1; j < N; j++) {
+          const a = positions[i],
+            b = positions[j];
+          const dir = b.clone().sub(a),
+            len = dir.length();
+
+          const bar = new THREE.Mesh(
+            new THREE.BoxGeometry(len, 0.04, 0.35),
+            roadMat
+          );
+          bar.position.copy(a.clone().lerp(b, 0.5)).setY(0.02);
+          bar.quaternion.setFromUnitVectors(
+            new THREE.Vector3(1, 0, 0),
+            dir.normalize()
+          );
+          mapGroup.add(bar);
+
+          const pickGeo = new THREE.BufferGeometry().setFromPoints([
+            a.clone().setY(0.02),
+            b.clone().setY(0.02),
+          ]);
+          const pick = new THREE.Line(
+            pickGeo,
+            new THREE.LineBasicMaterial({ transparent: true, opacity: 0 })
+          );
+          pick.userData = { i, j, gas: def.costs[i][j] };
+          mapGroup.add(pick);
+          edges.push(pick);
+        }
+      }
+    }
+
+    /* --- Animation Loop --- */
+    const clock = new THREE.Clock();
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = clock.getDelta();
+
+      controls.update();
+      updateOverlay();
+
+      /* gate easing */
+      nodes.forEach((n) => {
+        const g = n.userData.gate;
+        g.position.y += (g.userData.targetY - g.position.y) * 0.15;
+      });
+
+      /* truck movement */
+      if (move) {
+        move.el += dt;
+        const t = Math.min(move.el / move.dur, 1);
+        truck.position.lerpVectors(move.from, move.to, t);
+        truck.rotation.y = Math.atan2(
+          move.to.x - move.from.x,
+          move.to.z - move.from.z
+        );
+        if (t >= 1) {
+          setGate(move.dest, true);
+          move = null;
+          if (closed) setTimeout(evaluate, 150);
+        }
+      }
+
+      /* confetti / debris */
+      [conf, deb].forEach((arr) => {
+        for (let i = arr.length - 1; i >= 0; i--) {
+          const p = arr[i];
+          p.userData.v.y -= 9.8 * dt * 0.5;
+          p.position.addScaledVector(p.userData.v, dt);
+          p.rotation.x += dt * 4;
+          p.rotation.y += dt * 5;
+          p.userData.life -= dt;
+          p.material.opacity = p.userData.life / 3;
+          if (p.userData.life <= 0) {
+            scene.remove(p);
+            arr.splice(i, 1);
+          }
+        }
+      });
+
+      renderer.render(scene, camera);
+    }
+
+    /* Init */
+    updateLevelButtons();
+    reset(true);
+    animate();
+  </script>
+</body>
+</html>
